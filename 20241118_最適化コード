@@ -1,0 +1,308 @@
+import itertools
+import numpy as np
+from tqdm import tqdm  # 進捗バーを表示するライブラリ
+import math
+
+# --- 調整パラメータ ---
+alpha = 1.0    # 期待利益のパラメータ
+beta = 2.0    # 労働時間の分散のパラメータ
+gamma = 2.0    # 多様な作付けを推奨するパラメータ
+wage_rate = 1000  # 時給（円）
+
+# --- 作物データ ---
+crop_data = {
+1: {"作物名": "レタス（春まき）", "所属科": "キク科", "種まき月": 3, "収穫月": 5, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.6,"取引価格": 109, "基準駆除コスト": 15.8571013672572},
+2: {"作物名": "白菜（秋まき）", "所属科": "アブラナ科", "種まき月": 8, "収穫月": 11, "種まき時間": 0.04, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.12, "収穫時間": 0.075, "収穫量": 4,"取引価格": 100, "基準駆除コスト": 26.0309284878499},
+3: {"作物名": "ブロッコリー（秋まき）", "所属科": "アブラナ科", "種まき月": 8, "収穫月": 11, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.12, "収穫時間": 0.07, "収穫量": 1.9,"取引価格": 460, "基準駆除コスト": 57.9859486021813},
+4: {"作物名": "ニラ（春まき）", "所属科": "ヒガンバナ科", "種まき月": 3, "収穫月": 7, "種まき時間": 0.025, "間引き・手入れ時間": 0.04, "除草・害虫駆除時間": 0.08, "収穫時間": 0.15, "収穫量": 2,"取引価格": 778, "基準駆除コスト": 86.0094876394791},
+5: {"作物名": "かぼちゃ (春まき)", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.065, "収穫量": 2.2,"取引価格": 181, "基準駆除コスト": 9.63034262451616},
+6: {"作物名": "ほうれんそう（春まき）", "所属科": "アカザ科", "種まき月": 3, "収穫月": 5, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.08, "収穫時間": 0.05, "収穫量": 2.5,"取引価格": 475, "基準駆除コスト": 70.5308017476449},
+7: {"作物名": "トマト（春まき）", "所属科": "ナス科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.13, "収穫時間": 0.08, "収穫量": 3.5,"取引価格": 354, "基準駆除コスト": 70.8712737336333},
+8: {"作物名": "サニーレタス（春まき）", "所属科": "キク科", "種まき月": 3, "収穫月": 5, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.5,"取引価格": 225, "基準駆除コスト": 25.0215522166143},
+9: {"作物名": "ミニトマト（春まき）", "所属科": "ナス科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.12, "収穫時間": 0.07, "収穫量": 3.8,"取引価格": 450, "基準駆除コスト": 9.73813766665427},
+10: {"作物名": "レタス（秋まき）", "所属科": "キク科", "種まき月": 9, "収穫月": 11, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.8,"取引価格": 183, "基準駆除コスト": 31.3641721235877},
+11: {"作物名": "ほうれんそう（秋まき）", "所属科": "アカザ科", "種まき月": 9, "収穫月": 11, "種まき時間": 0.025, "間引き・手入れ時間": 0.04, "除草・害虫駆除時間": 0.07, "収穫時間": 0.045, "収穫量": 2.8,"取引価格": 486, "基準駆除コスト": 71.4967878579683},
+12: {"作物名": "にがうり（春まき）", "所属科": "ウリ科", "種まき月": 5, "収穫月": 8, "種まき時間": 0.03, "間引き・手入れ時間": 0.04, "除草・害虫駆除時間": 0.09, "収穫時間": 0.06, "収穫量": 2.4,"取引価格": 420, "基準駆除コスト": 29.8124071603121},
+13: {"作物名": "ネギ（夏まき）", "所属科": "ヒガンバナ科", "種まき月": 3, "収穫月": 7, "種まき時間": 0.028, "間引き・手入れ時間": 0.03, "除草・害虫駆除時間": 0.03, "収穫時間": 0.08, "収穫量": 2.5,"取引価格": 320, "基準駆除コスト": 35.6676964522464},
+14: {"作物名": "サニーレタス（秋まき）", "所属科": "キク科", "種まき月": 9, "収穫月": 11, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.7,"取引価格": 145, "基準駆除コスト": 12.8463133165824},
+15: {"作物名": "ブロッコリー（春まき）", "所属科": "アブラナ科", "種まき月": 3, "収穫月": 6, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.12, "収穫時間": 0.07, "収穫量": 1.8,"取引価格": 397, "基準駆除コスト": 17.5008653583999},
+16: {"作物名": "にんじん（春まき）", "所属科": "セリ科", "種まき月": 3, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.11, "収穫時間": 0.07, "収穫量": 3,"取引価格": 132, "基準駆除コスト": 0.786045740299654},
+17: {"作物名": "なす（春まき）", "所属科": "ナス科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.13, "収穫時間": 0.075, "収穫量": 2.5,"取引価格": 341, "基準駆除コスト": 15.2348145113958},
+18: {"作物名": "きゅうり（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.07, "収穫量": 2.5,"取引価格": 316, "基準駆除コスト": 17.1843529721862},
+19: {"作物名": "キャベツ（秋まき）", "所属科": "アブラナ科", "種まき月": 8, "収穫月": 11, "種まき時間": 0.035, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.11, "収穫時間": 0.065, "収穫量": 3.8,"取引価格": 85, "基準駆除コスト": 16.3266150917352},
+20: {"作物名": "メロン（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.045, "間引き・手入れ時間": 0.08, "除草・害虫駆除時間": 0.13, "収穫時間": 0.085, "収穫量": 2,"取引価格": 345, "基準駆除コスト": 11.1047344580756},
+21: {"作物名": "キャベツ（春まき）", "所属科": "アブラナ科", "種まき月": 3, "収穫月": 6, "種まき時間": 0.035, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.11, "収穫時間": 0.065, "収穫量": 3.5,"取引価格": 84, "基準駆除コスト": 0.701337630313325},
+22: {"作物名": "とうもろこし（春まき）", "所属科": "イネ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.045, "間引き・手入れ時間": 0.08, "除草・害虫駆除時間": 0.13, "収穫時間": 0.08, "収穫量": 2,"取引価格": 254, "基準駆除コスト": 14.2062369363369},
+23: {"作物名": "にんじん（夏まき）", "所属科": "セリ科", "種まき月": 7, "収穫月": 11, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.11, "収穫時間": 0.07, "収穫量": 2.8,"取引価格": 210, "基準駆除コスト": 36.6452874937128},
+24: {"作物名": "ズッキーニ（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.065, "収穫量": 2.1,"取引価格": 428, "基準駆除コスト": 62.1771286387072},
+25: {"作物名": "すいか（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.12, "収穫時間": 0.075, "収穫量": 3,"取引価格": 231, "基準駆除コスト": 14.1681111312535},
+26: {"作物名": "こだますいか（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.12, "収穫時間": 0.075, "収穫量": 2.8,"取引価格": 322, "基準駆除コスト": 42.6846205042585},
+}
+
+
+# --- 連作障害マトリックス ---
+rotation_compatibility = {
+    "アカザ科": {"アカザ科": False, "アブラナ科": True, "イネ科": True, "ウリ科": True, "キク科": True, "セリ科": False, "ナス科": False, "ヒガンバナ科": True},
+    "アブラナ科": {"アカザ科": True, "アブラナ科": False, "イネ科": True, "ウリ科": True, "キク科": True, "セリ科": True, "ナス科": True, "ヒガンバナ科": False},
+    "イネ科": {"アカザ科": True, "アブラナ科": True, "イネ科": False, "ウリ科": True, "キク科": True, "セリ科": True, "ナス科": True, "ヒガンバナ科": True},
+    "ウリ科": {"アカザ科": True, "アブラナ科": True, "イネ科": True, "ウリ科": False, "キク科": True, "セリ科": True, "ナス科": False, "ヒガンバナ科": True},
+    "キク科": {"アカザ科": True, "アブラナ科": True, "イネ科": True, "ウリ科": True, "キク科": False, "セリ科": True, "ナス科": True, "ヒガンバナ科": False},
+    "セリ科": {"アカザ科": False, "アブラナ科": True, "イネ科": True, "ウリ科": True, "キク科": True, "セリ科": False, "ナス科": True, "ヒガンバナ科": True},
+    "ナス科": {"アカザ科": False, "アブラナ科": True, "イネ科": True, "ウリ科": False, "キク科": True, "セリ科": True, "ナス科": False, "ヒガンバナ科": True},
+    "ヒガンバナ科": {"アカザ科": True, "アブラナ科": False, "イネ科": True, "ウリ科": True, "キク科": False, "セリ科": True, "ナス科": True, "ヒガンバナ科": False},
+}
+
+# --- 駆除コスト軽減データ ---
+cost_reduction_data = [
+{"作物": "サニーレタス（春まき）", "組み合わせ作物": "ブロッコリー（春まき）", "軽減率": 36},
+{"作物": "サニーレタス（春まき）", "組み合わせ作物": "キャベツ（春まき）", "軽減率": 13},
+{"作物": "サニーレタス（秋まき）", "組み合わせ作物": "ブロッコリー（秋まき）", "軽減率": 40},
+{"作物": "サニーレタス（秋まき）", "組み合わせ作物": "キャベツ（秋まき）", "軽減率": 15},
+{"作物": "レタス（春まき）", "組み合わせ作物": "ブロッコリー（春まき）", "軽減率": 13},
+{"作物": "レタス（春まき）", "組み合わせ作物": "キャベツ（春まき）", "軽減率": 20},
+{"作物": "レタス（春まき）", "組み合わせ作物": "にんじん（春まき）", "軽減率": 10},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "ブロッコリー（秋まき）", "軽減率": 31},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "キャベツ（秋まき）", "軽減率": 24},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "にんじん（夏まき）", "軽減率": 6},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "白菜（秋まき）", "軽減率": 7},
+{"作物": "ブロッコリー（春まき）", "組み合わせ作物": "サニーレタス（春まき）", "軽減率": 40},
+{"作物": "ブロッコリー（春まき）", "組み合わせ作物": "レタス（春まき）", "軽減率": 33},
+{"作物": "ブロッコリー（秋まき）", "組み合わせ作物": "サニーレタス（秋まき）", "軽減率": 14},
+{"作物": "ブロッコリー（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 36},
+{"作物": "ほうれんそう（春まき）", "組み合わせ作物": "ブロッコリー（春まき）", "軽減率": 14},
+{"作物": "ほうれんそう（春まき）", "組み合わせ作物": "キャベツ（春まき）", "軽減率": 26},
+{"作物": "ほうれんそう（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 33},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "ブロッコリー（秋まき）", "軽減率": 10},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "キャベツ（秋まき）", "軽減率": 36},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "白菜（秋まき）", "軽減率": 39},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 22},
+{"作物": "にんじん（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 30},
+{"作物": "にんじん（夏まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 6},
+{"作物": "かぼちゃ（春まき）", "組み合わせ作物": "なす（春まき）", "軽減率": 10},
+{"作物": "かぼちゃ（春まき）", "組み合わせ作物": "レタス（春まき）", "軽減率": 21},
+{"作物": "かぼちゃ（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 23},
+{"作物": "メロン（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 20},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "にんじん（春まき）", "軽減率": 16},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "レタス（春まき）", "軽減率": 6},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "サニーレタス（春まき）", "軽減率": 28},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "ニラ（春まき）", "軽減率": 17},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "トマト（春まき）", "軽減率": 31},
+{"作物": "キャベツ（秋まき）", "組み合わせ作物": "にんじん（夏まき）", "軽減率": 30},
+{"作物": "キャベツ（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 9},
+{"作物": "キャベツ（秋まき）", "組み合わせ作物": "サニーレタス（秋まき）", "軽減率": 31},
+{"作物": "ミニトマト（春まき）", "組み合わせ作物": "ニラ（春まき）", "軽減率": 29},
+{"作物": "白菜（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 10},
+{"作物": "白菜（秋まき）", "組み合わせ作物": "サニーレタス（秋まき）", "軽減率": 34},
+{"作物": "白菜（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 27},
+{"作物": "トマト（春まき）", "組み合わせ作物": "ニラ（春まき）", "軽減率": 18},
+]
+
+
+# --- チェーン生成関数 ---
+def generate_chains(crop_id, chain=(), chains=set(), occupied_months=set()):
+    crop = crop_data[crop_id]
+    chain = chain + (crop_id,)
+    start_month, end_month = crop["種まき月"], crop["収穫月"]
+
+    # 連作障害チェック
+    if len(chain) > 1:
+        prev_crop = crop_data[chain[-2]]
+        if not rotation_compatibility[prev_crop["所属科"]][crop["所属科"]]:
+            return chains
+
+    # 栽培期間の重複チェック
+    for month in range(start_month, end_month + 1):
+        if month in occupied_months:
+            return chains
+
+    occupied_months.update(range(start_month, end_month + 1))
+    chains.add(chain)
+
+    # 次の作物を再帰的に追加
+    next_crops = [cid for cid in crop_data if cid != crop_id and crop_data[cid]["種まき月"] > end_month]
+    for next_crop_id in next_crops:
+        generate_chains(next_crop_id, chain, chains, occupied_months)
+
+    # 栽培期間をリセット
+    for month in range(start_month, end_month + 1):
+        occupied_months.discard(month)
+
+    return chains
+
+# --- 年間1作物のチェーンを除外 ---
+def filter_single_crop_chains(chains):
+    filtered = {chain for chain in chains if len(chain) > 1}
+    return filtered
+
+# --- 労働コストの計算 ---
+def calculate_labor_cost(chain):
+    """
+    労働コストと労働時間の分散を計算し、各月の労働時間リストも返す関数。
+    """
+    total_workload = [0] * 12  # 各月の労働時間を格納
+    for crop_id in chain:
+        crop = crop_data[crop_id]
+        start_month, end_month = crop["種まき月"], crop["収穫月"]
+
+        # 間引き・手入れ + 除草の時間を栽培期間に均等配分
+        monthly_maintenance = (crop["間引き・手入れ時間"] + crop["除草・害虫駆除時間"]) / (end_month - start_month + 1)
+        for month in range(12):
+            if start_month <= month + 1 <= end_month:
+                total_workload[month] += monthly_maintenance
+                if month + 1 == start_month:
+                    total_workload[month] += crop["種まき時間"]
+                elif month + 1 == end_month:
+                    total_workload[month] += crop["収穫時間"]
+
+    # 労働時間の分散とコストの計算
+    labor_variance = np.var(total_workload)
+    labor_cost = sum(total_workload) * wage_rate
+    return labor_cost, labor_variance, total_workload
+
+# --- 駆除コスト軽減効果の算出 ---
+def calculate_reduced_cost(combination):
+    """
+    ポートフォリオ全体のチェーンの組み合わせに基づいた駆除コストの軽減を計算する関数
+    """
+    total_reduction = 0
+    for chain1, chain2 in itertools.combinations(combination, 2):
+        for crop_id1 in chain1:
+            for crop_id2 in chain2:
+                crop1 = crop_data[crop_id1]["作物名"]
+                crop2 = crop_data[crop_id2]["作物名"]
+                
+                # 駆除コストの軽減率を取得
+                reduction_rate = next(
+                    (item["軽減率"] for item in cost_reduction_data
+                     if item["作物"] == crop1 and item["組み合わせ作物"] == crop2), 0
+                )
+                
+                # 軽減効果を計算し、合計軽減コストに加算
+                total_reduction += crop_data[crop_id1]["基準駆除コスト"] * (reduction_rate / 100)
+    
+    return total_reduction
+
+# --- ポートフォリオ全体の評価 ---
+def evaluate_portfolio(chains, field_count=4):
+    """
+    ポートフォリオ全体の利益、労働コスト、分散、多様性を評価し、最適な組み合わせを探す。
+    """
+    max_score = -np.inf
+    best_combination = None
+    total_combinations = len(list(itertools.combinations_with_replacement(chains, field_count)))
+
+    with tqdm(total=total_combinations, desc="◆ポートフォリオ評価中", unit="comb") as pbar:
+        for combination in itertools.combinations_with_replacement(chains, field_count):
+            # 全区画で同一作物を栽培している場合はスキップ
+            unique_crops = set()
+            for chain in combination:
+                unique_crops.update(chain)
+
+            # --- 多様性ペナルティの計算 ---
+            # 異なる作物が多いほどペナルティが小さくなるように設定（指数関数的な重み）
+            diversity_penalty = math.exp(-0.5 * len(unique_crops))
+
+            total_profit = 0
+            total_labor_cost = 0
+            total_labor_variance = 0
+            total_workload_portfolio = [0] * 12
+      
+            # 各チェーンの労働時間と利益を計算
+            for chain in combination:
+                labor_cost, labor_var, chain_workload = calculate_labor_cost(chain)
+                total_labor_cost += labor_cost
+
+                # 各月の労働時間を合計
+                for month in range(12):
+                    total_workload_portfolio[month] += chain_workload[month]
+
+                # 各チェーンの利益を計算
+                for crop_id in chain:
+                    crop = crop_data[crop_id]
+                    total_profit += crop["収穫量"] * crop["取引価格"]
+                    
+            # デバッグ用の出力
+            #print(f"\nCombination: {[crop_data[c]['作物名'] for chain in combination for c in chain]}")
+            #print(f"Total Profit: {total_profit}")
+            #print(f"Total Labor Cost: {total_labor_cost}")
+
+                
+            # 全区画の労働時間の分散を計算
+            total_labor_variance = np.var(total_workload_portfolio)
+
+            # 駆除コストの軽減効果を考慮
+            total_reduction_cost = calculate_reduced_cost(combination)
+            #print(f"Total Reduction Cost: {total_reduction_cost}")
+
+            # 調整後の利益の計算
+            adjusted_profit = total_profit - (total_labor_cost + total_reduction_cost)
+            #print(f"Adjusted Profit: {adjusted_profit}")
+
+            # パラメータのスケール調整
+            scaled_alpha = alpha / 9137.17
+            scaled_beta = beta / 0.04
+            scaled_gamma = gamma / 0.37
+            # スコアの計算
+            score = (scaled_alpha * adjusted_profit) / (scaled_beta * total_labor_variance + scaled_gamma * diversity_penalty + 1)
+
+            if score > max_score:
+                max_score = score
+                best_combination = combination
+                best_adjusted_profit = adjusted_profit
+                
+            pbar.update(1)
+
+    # 最適なポートフォリオの結果を出力
+    print(f"\nAdjusted Profit: {best_adjusted_profit:.2f}, \nLabor Variance: {total_labor_variance:.2f}, \nDiversity Penalty: {diversity_penalty:.2f}")
+    return best_combination, max_score
+
+def display_portfolio_workload(best_portfolio):
+    if not best_portfolio:
+        print("最適なポートフォリオが見つかりませんでした。")
+        return
+
+    total_workload = [0] * 12
+
+    print("\n◆各区画の各月の労働時間")
+    for i, chain in enumerate(best_portfolio, 1):
+        labor_cost, labor_var, chain_workload = calculate_labor_cost(chain)
+        print(f"\n区画 {i}: " + " -> ".join([crop_data[c]["作物名"] for c in chain]))
+        print("月:        ", "\t".join([str(month + 1) for month in range(12)]))
+        print("労働時間:", "\t".join([f"{chain_workload[month]:.2f}" for month in range(12)]))
+
+        for month in range(12):
+            total_workload[month] += chain_workload[month]
+
+    print("\n◆全区画の合計労働時間")
+    print("月:        ", "\t".join([str(month + 1) for month in range(12)]))
+    print("合計労働時間:", "\t".join([f"{total_workload[month]:.2f}" for month in range(12)]))
+
+    #合計労働時間の分散を表示
+    labor_variance = np.var(total_workload)
+    print(f"\n全区画の労働時間の分散: {labor_variance:.2f}\n")
+
+def main():
+    all_chains = set()
+    for crop_id in crop_data.keys():
+        chains = generate_chains(crop_id)
+        all_chains.update(chains)
+
+    filtered_chains = filter_single_crop_chains(all_chains)
+    print(f"\n◆生成されたチェーンの数: {len(filtered_chains)}")
+    for chain in filtered_chains:
+        print(" -> ".join([crop_data[c]["作物名"] for c in chain]))
+    print("\n")
+    
+    best_portfolio, best_score = evaluate_portfolio(filtered_chains)
+    print(f"\n◆最終スコア: {best_score}")
+    print("\n◆生成されたポートフォリオ:")
+    if best_portfolio:
+        for i, chain in enumerate(best_portfolio, 1):
+            print(f"区画 {i}: " + " -> ".join([crop_data[c]["作物名"] for c in chain]))
+
+        # 各区画の労働時間と全体の労働時間を表示
+        #display_portfolio_workload(best_portfolio)
+
+
+if __name__ == "__main__":
+    main()
