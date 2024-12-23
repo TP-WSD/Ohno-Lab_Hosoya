@@ -1,0 +1,557 @@
+import random
+
+# --- パラメータ設定 ---
+POPULATION_SIZE = 200  # 集団サイズ
+CROSSOVER_RATE = 0.1  # 交叉率
+MUTATION_RATE = 0.3  # 突然変異率
+MAX_GENERATIONS = 200  # 最大世代数
+CONVERGENCE_THRESHOLD = 30  # 収束条件（世代数）
+hourly_wage = 1200  # 時給
+max_years_input = 2
+
+# --- 必要なデータ（既存コードを活用） ---
+# crops, rotation_compatibility, rotation_years, yield_synergy_matrix, cost_reduction_data のデータは既存のものを使用
+
+# --- 作物データ ---
+crops = [
+    {"作物名": "レタス（春まき）", "所属科": "キク科", "種まき月": 3, "収穫月": 5, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.6,"取引価格": 109, "基準駆除コスト": 15.8571013672572},
+    {"作物名": "ニラ（春まき）", "所属科": "ヒガンバナ科", "種まき月": 3, "収穫月": 7, "種まき時間": 0.025, "間引き・手入れ時間": 0.04, "除草・害虫駆除時間": 0.08, "収穫時間": 0.15, "収穫量": 2,"取引価格": 778, "基準駆除コスト": 86.0094876394791},
+    {"作物名": "キャベツ（春まき）", "所属科": "アブラナ科", "種まき月": 3, "収穫月": 6, "種まき時間": 0.035, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.11, "収穫時間": 0.065, "収穫量": 3.5,"取引価格": 84, "基準駆除コスト": 0.701337630313325},
+    {"作物名": "ほうれんそう（春まき）", "所属科": "アカザ科", "種まき月": 3, "収穫月": 5, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.08, "収穫時間": 0.05, "収穫量": 2.5,"取引価格": 475, "基準駆除コスト": 70.5308017476449},
+    {"作物名": "サニーレタス（春まき）", "所属科": "キク科", "種まき月": 3, "収穫月": 5, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.5,"取引価格": 225, "基準駆除コスト": 25.0215522166143},
+    {"作物名": "ネギ（夏まき）", "所属科": "ヒガンバナ科", "種まき月": 3, "収穫月": 7, "種まき時間": 0.028, "間引き・手入れ時間": 0.03, "除草・害虫駆除時間": 0.03, "収穫時間": 0.08, "収穫量": 2.5,"取引価格": 320, "基準駆除コスト": 35.6676964522464},
+    {"作物名": "ブロッコリー（春まき）", "所属科": "アブラナ科", "種まき月": 3, "収穫月": 6, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.12, "収穫時間": 0.07, "収穫量": 1.8,"取引価格": 397, "基準駆除コスト": 17.5008653583999},
+    {"作物名": "にんじん（春まき）", "所属科": "セリ科", "種まき月": 3, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.11, "収穫時間": 0.07, "収穫量": 3,"取引価格": 132, "基準駆除コスト": 0.786045740299654},
+    {"作物名": "なす（春まき）", "所属科": "ナス科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.13, "収穫時間": 0.075, "収穫量": 2.5,"取引価格": 341, "基準駆除コスト": 15.2348145113958},
+    {"作物名": "きゅうり（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.07, "収穫量": 2.5,"取引価格": 316, "基準駆除コスト": 17.1843529721862},
+    {"作物名": "メロン（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.045, "間引き・手入れ時間": 0.08, "除草・害虫駆除時間": 0.13, "収穫時間": 0.085, "収穫量": 2,"取引価格": 345, "基準駆除コスト": 11.1047344580756},
+    {"作物名": "とうもろこし（春まき）", "所属科": "イネ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.045, "間引き・手入れ時間": 0.08, "除草・害虫駆除時間": 0.13, "収穫時間": 0.08, "収穫量": 2,"取引価格": 254, "基準駆除コスト": 14.2062369363369},
+    {"作物名": "ズッキーニ（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.065, "収穫量": 2.1,"取引価格": 428, "基準駆除コスト": 62.1771286387072},
+    {"作物名": "すいか（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.12, "収穫時間": 0.075, "収穫量": 3,"取引価格": 231, "基準駆除コスト": 14.1681111312535},
+    {"作物名": "こだますいか（春まき）", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.12, "収穫時間": 0.075, "収穫量": 2.8,"取引価格": 322, "基準駆除コスト": 42.6846205042585},
+    {"作物名": "かぼちゃ (春まき)", "所属科": "ウリ科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.065, "収穫量": 2.2,"取引価格": 181, "基準駆除コスト": 9.63034262451616},
+    {"作物名": "トマト（春まき）", "所属科": "ナス科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.04, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.13, "収穫時間": 0.08, "収穫量": 3.5,"取引価格": 354, "基準駆除コスト": 70.8712737336333},
+    {"作物名": "ミニトマト（春まき）", "所属科": "ナス科", "種まき月": 4, "収穫月": 7, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.12, "収穫時間": 0.07, "収穫量": 3.8,"取引価格": 450, "基準駆除コスト": 9.73813766665427},
+    {"作物名": "にがうり（春まき）", "所属科": "ウリ科", "種まき月": 5, "収穫月": 8, "種まき時間": 0.03, "間引き・手入れ時間": 0.04, "除草・害虫駆除時間": 0.09, "収穫時間": 0.06, "収穫量": 2.4,"取引価格": 420, "基準駆除コスト": 29.8124071603121}, 
+    {"作物名": "にんじん（夏まき）", "所属科": "セリ科", "種まき月": 7, "収穫月": 11, "種まき時間": 0.035, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.11, "収穫時間": 0.07, "収穫量": 2.8,"取引価格": 210, "基準駆除コスト": 36.6452874937128},
+    {"作物名": "白菜（秋まき）", "所属科": "アブラナ科", "種まき月": 8, "収穫月": 11, "種まき時間": 0.04, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.12, "収穫時間": 0.075, "収穫量": 4,"取引価格": 100, "基準駆除コスト": 26.0309284878499},
+    {"作物名": "ブロッコリー（秋まき）", "所属科": "アブラナ科", "種まき月": 8, "収穫月": 11, "種まき時間": 0.04, "間引き・手入れ時間": 0.07, "除草・害虫駆除時間": 0.12, "収穫時間": 0.07, "収穫量": 1.9,"取引価格": 460, "基準駆除コスト": 57.9859486021813},
+    {"作物名": "キャベツ（秋まき）", "所属科": "アブラナ科", "種まき月": 8, "収穫月": 11, "種まき時間": 0.035, "間引き・手入れ時間": 0.06, "除草・害虫駆除時間": 0.11, "収穫時間": 0.065, "収穫量": 3.8,"取引価格": 85, "基準駆除コスト": 16.3266150917352},
+    {"作物名": "レタス（秋まき）", "所属科": "キク科", "種まき月": 9, "収穫月": 11, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.8,"取引価格": 183, "基準駆除コスト": 31.3641721235877},
+    {"作物名": "ほうれんそう（秋まき）", "所属科": "アカザ科", "種まき月": 9, "収穫月": 11, "種まき時間": 0.025, "間引き・手入れ時間": 0.04, "除草・害虫駆除時間": 0.07, "収穫時間": 0.045, "収穫量": 2.8,"取引価格": 486, "基準駆除コスト": 71.4967878579683},
+    {"作物名": "サニーレタス（秋まき）", "所属科": "キク科", "種まき月": 9, "収穫月": 11, "種まき時間": 0.03, "間引き・手入れ時間": 0.05, "除草・害虫駆除時間": 0.1, "収穫時間": 0.05, "収穫量": 2.7,"取引価格": 145, "基準駆除コスト": 12.8463133165824},
+]
+
+# --- 連作障害マトリックス ---
+rotation_compatibility = {
+    "アカザ科": {"アカザ科": False, "アブラナ科": True, "イネ科": True, "ウリ科": True, "キク科": True, "セリ科": False, "ナス科": False, "ヒガンバナ科": True},
+    "アブラナ科": {"アカザ科": True, "アブラナ科": False, "イネ科": True, "ウリ科": True, "キク科": True, "セリ科": True, "ナス科": True, "ヒガンバナ科": False},
+    "イネ科": {"アカザ科": True, "アブラナ科": True, "イネ科": False, "ウリ科": True, "キク科": True, "セリ科": True, "ナス科": True, "ヒガンバナ科": True},
+    "ウリ科": {"アカザ科": True, "アブラナ科": True, "イネ科": True, "ウリ科": False, "キク科": True, "セリ科": True, "ナス科": False, "ヒガンバナ科": True},
+    "キク科": {"アカザ科": True, "アブラナ科": True, "イネ科": True, "ウリ科": True, "キク科": False, "セリ科": True, "ナス科": True, "ヒガンバナ科": False},
+    "セリ科": {"アカザ科": False, "アブラナ科": True, "イネ科": True, "ウリ科": True, "キク科": True, "セリ科": False, "ナス科": True, "ヒガンバナ科": True},
+    "ナス科": {"アカザ科": False, "アブラナ科": True, "イネ科": True, "ウリ科": False, "キク科": True, "セリ科": True, "ナス科": False, "ヒガンバナ科": True},
+    "ヒガンバナ科": {"アカザ科": True, "アブラナ科": False, "イネ科": True, "ウリ科": True, "キク科": False, "セリ科": True, "ナス科": True, "ヒガンバナ科": False},
+}
+
+# --- 輪作年限データ ---
+rotation_years = {
+    "アカザ科": 2,
+    "アブラナ科": 3,
+    "イネ科": 1,
+    "ウリ科": 3,
+    "キク科": 2,
+    "セリ科": 1,
+    "ナス科": 3,
+    "ヒガンバナ科": 2,
+}
+
+# --- 収量増加倍率マトリックス --- 
+yield_synergy_matrix = {
+    "アカザ科": {"アカザ科": 1.0, "アブラナ科": 1.1, "イネ科": 1.05, "ウリ科": 1.0, "キク科": 1.15, "セリ科": 1.02, "ナス科": 1.0, "ヒガンバナ科": 1.00},
+    "アブラナ科": {"アカザ科": 1.1, "アブラナ科": 1.0, "イネ科": 1.1, "ウリ科": 1.2, "キク科": 1.15, "セリ科": 1.1, "ナス科": 1.05, "ヒガンバナ科": 1.0},
+    "イネ科": {"アカザ科": 1.05, "アブラナ科": 1.1, "イネ科": 1.0, "ウリ科": 1.1, "キク科": 1.0, "セリ科": 1.1, "ナス科": 1.05, "ヒガンバナ科": 1.05},
+    "ウリ科": {"アカザ科": 1.0, "アブラナ科": 1.2, "イネ科": 1.1, "ウリ科": 1.0, "キク科": 1.15, "セリ科": 1.1, "ナス科": 1.2, "ヒガンバナ科": 1.05},
+    "キク科": {"アカザ科": 1.15, "アブラナ科": 1.15, "イネ科": 1.0, "ウリ科": 1.15, "キク科": 1.0, "セリ科": 1.05, "ナス科": 1.1, "ヒガンバナ科": 1.0},
+    "セリ科": {"アカザ科": 1.0, "アブラナ科": 1.1, "イネ科": 1.1, "ウリ科": 1.1, "キク科": 1.05, "セリ科": 1.0, "ナス科": 1.1, "ヒガンバナ科": 1.05},
+    "ナス科": {"アカザ科": 1.0, "アブラナ科": 1.05, "イネ科": 1.05, "ウリ科": 1.2, "キク科": 1.1, "セリ科": 1.1, "ナス科": 1.0, "ヒガンバナ科": 1.05},
+    "ヒガンバナ科": {"アカザ科": 1.05, "アブラナ科": 1.0, "イネ科": 1.05, "ウリ科": 1.1, "キク科": 1.0, "セリ科": 1.05, "ナス科": 1.05, "ヒガンバナ科": 1.0},
+}
+
+# --- 駆除コスト軽減データ ---
+cost_reduction_data = [
+{"作物": "サニーレタス（春まき）", "組み合わせ作物": "ブロッコリー（春まき）", "軽減率": 36},
+{"作物": "サニーレタス（春まき）", "組み合わせ作物": "キャベツ（春まき）", "軽減率": 13},
+{"作物": "サニーレタス（秋まき）", "組み合わせ作物": "ブロッコリー（秋まき）", "軽減率": 40},
+{"作物": "サニーレタス（秋まき）", "組み合わせ作物": "キャベツ（秋まき）", "軽減率": 15},
+{"作物": "レタス（春まき）", "組み合わせ作物": "ブロッコリー（春まき）", "軽減率": 13},
+{"作物": "レタス（春まき）", "組み合わせ作物": "キャベツ（春まき）", "軽減率": 20},
+{"作物": "レタス（春まき）", "組み合わせ作物": "にんじん（春まき）", "軽減率": 10},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "ブロッコリー（秋まき）", "軽減率": 31},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "キャベツ（秋まき）", "軽減率": 24},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "にんじん（夏まき）", "軽減率": 6},
+{"作物": "レタス（秋まき）", "組み合わせ作物": "白菜（秋まき）", "軽減率": 7},
+{"作物": "ブロッコリー（春まき）", "組み合わせ作物": "サニーレタス（春まき）", "軽減率": 40},
+{"作物": "ブロッコリー（春まき）", "組み合わせ作物": "レタス（春まき）", "軽減率": 33},
+{"作物": "ブロッコリー（秋まき）", "組み合わせ作物": "サニーレタス（秋まき）", "軽減率": 14},
+{"作物": "ブロッコリー（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 36},
+{"作物": "ほうれんそう（春まき）", "組み合わせ作物": "ブロッコリー（春まき）", "軽減率": 14},
+{"作物": "ほうれんそう（春まき）", "組み合わせ作物": "キャベツ（春まき）", "軽減率": 26},
+{"作物": "ほうれんそう（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 33},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "ブロッコリー（秋まき）", "軽減率": 10},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "キャベツ（秋まき）", "軽減率": 36},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "白菜（秋まき）", "軽減率": 39},
+{"作物": "ほうれんそう（秋まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 22},
+{"作物": "にんじん（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 30},
+{"作物": "にんじん（夏まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 6},
+{"作物": "かぼちゃ（春まき）", "組み合わせ作物": "なす（春まき）", "軽減率": 10},
+{"作物": "かぼちゃ（春まき）", "組み合わせ作物": "レタス（春まき）", "軽減率": 21},
+{"作物": "かぼちゃ（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 23},
+{"作物": "メロン（春まき）", "組み合わせ作物": "ネギ（夏まき）", "軽減率": 20},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "にんじん（春まき）", "軽減率": 16},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "レタス（春まき）", "軽減率": 6},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "サニーレタス（春まき）", "軽減率": 28},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "ニラ（春まき）", "軽減率": 17},
+{"作物": "キャベツ（春まき）", "組み合わせ作物": "トマト（春まき）", "軽減率": 31},
+{"作物": "キャベツ（秋まき）", "組み合わせ作物": "にんじん（夏まき）", "軽減率": 30},
+{"作物": "キャベツ（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 9},
+{"作物": "キャベツ（秋まき）", "組み合わせ作物": "サニーレタス（秋まき）", "軽減率": 31},
+{"作物": "ミニトマト（春まき）", "組み合わせ作物": "ニラ（春まき）", "軽減率": 29},
+{"作物": "白菜（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 10},
+{"作物": "白菜（秋まき）", "組み合わせ作物": "サニーレタス（秋まき）", "軽減率": 34},
+{"作物": "白菜（秋まき）", "組み合わせ作物": "レタス（秋まき）", "軽減率": 27},
+{"作物": "トマト（春まき）", "組み合わせ作物": "ニラ（春まき）", "軽減率": 18},
+]
+
+# 作物が条件を満たしているか確認する関数
+def is_valid_crop(crop, occupied_months, last_rotation_year, year):
+    # 栽培期間の重複チェック
+    for month in range(crop["種まき月"], crop["収穫月"] + 1):
+        if (year, month) in occupied_months:
+            return False
+    # 輪作年限チェック
+    family = crop["所属科"]
+    if family in last_rotation_year and year - last_rotation_year[family] < rotation_years[family]:
+        return False
+    # 連作障害チェック
+    for other_family in last_rotation_year:
+        if not rotation_compatibility[family].get(other_family, True):
+            return False
+    return True
+
+def calculate_chain_revenue(chain, crops_data, hourly_wage):
+    """チェーンの利益を計算する関数"""
+    revenue = 0
+    for crop_info in chain:
+        # 作物データをcropsから検索
+        crop_data = next(crop for crop in crops_data if crop["作物名"] == crop_info["作物名"])
+        
+        # 人件費計算
+        labor_cost = (crop_data["種まき時間"] + crop_data["間引き・手入れ時間"] +
+                      crop_data["除草・害虫駆除時間"] + crop_data["収穫時間"]) * hourly_wage 
+        
+        # 利益 = 収穫量 * 取引価格 - 基準駆除コスト - 人件費
+        revenue += crop_data["収穫量"] * crop_data["取引価格"] - crop_data["基準駆除コスト"] - labor_cost
+        
+    return revenue
+
+def generate_all_chains(crops, hourly_wage, max_years=max_years_input):
+    """全てのチェーンを生成する関数"""
+    occupied_months = set()
+    last_rotation_year = {}
+    all_chains = []
+    seen_chains = set()  # 重複を防ぐための集合
+    chain_id = 1
+
+    def add_to_chains(chain):
+        nonlocal chain_id
+        # チェーンをタプル化して重複防止
+        sorted_chain = tuple(sorted((crop["栽培年"], crop["作物名"], crop["所属科"]) for crop in chain))
+        if sorted_chain not in seen_chains:
+            seen_chains.add(sorted_chain)
+            # チェーンの利益を計算
+            revenue = calculate_chain_revenue(chain, crops, hourly_wage)
+            # チェーン情報に利益を追加
+            all_chains.append({
+                "チェーン番号": chain_id,
+                "内容": chain[:],
+                "利益": revenue
+            })
+            chain_id += 1
+
+    def generate_chain(year, current_chain):
+        if year > max_years:
+            add_to_chains(current_chain)
+            return
+
+        for crop in crops:
+            if is_valid_crop(crop, occupied_months, last_rotation_year, year):
+                # 状態を更新
+                for month in range(crop["種まき月"], crop["収穫月"] + 1):
+                    occupied_months.add((year, month))
+                last_rotation_year[crop["所属科"]] = year
+                current_chain.append({"栽培年": year, "作物名": crop["作物名"], "所属科": crop["所属科"]})
+
+                # 同じ年でさらに作物を追加する可能性を試す
+                generate_chain(year, current_chain)
+
+                # 状態を元に戻す
+                for month in range(crop["種まき月"], crop["収穫月"] + 1):
+                    occupied_months.remove((year, month))
+                del last_rotation_year[crop["所属科"]]
+                current_chain.pop()
+
+        # すべての作物を試した後、次の年に進む
+        if year <= max_years:
+            generate_chain(year + 1, current_chain)
+
+    generate_chain(1, [])
+    return all_chains
+
+# 相乗効果による駆除コスト低減金額を算出
+def calculate_portfolio_synergy_same_year(portfolio, crops, cost_reduction_data):
+    """
+    ポートフォリオ内のシナジー効果（駆除コスト軽減）を、同じ栽培年の作物同士に限定して計算する関数。
+
+    :param portfolio: 選択されたポートフォリオ（複数のチェーン）
+    :param crops: 作物データ（収穫量、取引価格、基準駆除コストなどを含む）
+    :param cost_reduction_data: 駆除コスト軽減データ
+    :return: ポートフォリオ全体のシナジー効果（駆除コスト軽減額）
+    """
+    # 駆除コスト軽減データを辞書化
+    reduction_dict = {}
+    for entry in cost_reduction_data:
+        key = (entry["作物"], entry["組み合わせ作物"])
+        reduction_dict[key] = entry["軽減率"]
+
+    total_reduction = 0  # ポートフォリオ全体の軽減額
+
+    # ポートフォリオ内の作物を収集し、栽培年ごとに整理
+    crops_by_year = {}
+    for chain in portfolio:
+        for crop in chain["内容"]:
+            year = crop["栽培年"]
+            if year not in crops_by_year:
+                crops_by_year[year] = []
+            crops_by_year[year].append(crop)
+
+    # 各栽培年ごとにシナジー効果を計算
+    for year, crops_in_year in crops_by_year.items():
+        for crop in crops_in_year:
+            crop_name = crop["作物名"]
+            crop_cost = next((c["基準駆除コスト"] for c in crops if c["作物名"] == crop_name), 0)
+            reduction_sum = 0  # 現在の作物に適用される軽減効果の合計
+
+            # 同じ栽培年内の他の作物との関係を確認
+            seen_sources = set()  # 効果を与えた作物を記録
+            for other_crop in crops_in_year:
+                if crop == other_crop:
+                    continue  # 同じ作物を無視
+
+                # 他の作物からの効果を確認
+                key = (crop_name, other_crop["作物名"])
+                if key in reduction_dict and other_crop["作物名"] not in seen_sources:
+                    reduction_sum += reduction_dict[key]
+                    seen_sources.add(other_crop["作物名"])  # 効果を与えた作物を記録
+
+            # 軽減率を適用（最大100%）
+            effective_reduction = min(reduction_sum, 100)
+            reduction_amount = crop_cost * (effective_reduction / 100)
+            total_reduction += reduction_amount
+
+            # デバッグ情報を出力
+            #print(f"作物: {crop_name} (栽培年: {year}), 基準駆除コスト: {crop_cost}, 軽減率合計: {effective_reduction}%, 軽減額: {reduction_amount:.2f}")
+
+    return total_reduction
+
+# 相乗効果による収量増加による売上増加金額を算出
+def calculate_yield_increase_and_sales(portfolio, crops, yield_synergy_matrix):
+    """
+    同年で栽培期間が重複する作物同士に限定して収量増加効果を計算し、
+    重複適用を防ぐ。
+
+    :param portfolio: 選択されたポートフォリオ（複数のチェーン）
+    :param crops: 作物データ（収穫量、所属科などを含む）
+    :param yield_synergy_matrix: 収量増加倍率マトリックス
+    :return: ポートフォリオ全体の収量増加量（増加分のみ）
+    """
+    total_yield_increase = 0  # 全体の収量増加量
+    total_sales_increase = 0  # 全体の売上増加額
+
+    # ポートフォリオ内の作物を収集し、栽培年ごとに整理
+    crops_by_year = {}
+    for chain in portfolio:
+        for crop in chain["内容"]:
+            year = crop["栽培年"]
+            if year not in crops_by_year:
+                crops_by_year[year] = []
+            crops_by_year[year].append(crop)
+
+    # 各栽培年ごとに収量増加効果を計算
+    for year, crops_in_year in crops_by_year.items():
+        yield_increase_per_crop = {}  # 各作物ごとの収量増加量を記録
+        for target_crop in crops_in_year:
+            target_family = target_crop["所属科"]
+            target_name = target_crop["作物名"]
+            target_price = next(crop["取引価格"] for crop in crops if crop["作物名"] == target_name)
+            target_base_yield = next(crop["収穫量"] for crop in crops if crop["作物名"] == target_name)
+            target_sowing_month = next(crop["種まき月"] for crop in crops if crop["作物名"] == target_name)
+            target_harvest_month = next(crop["収穫月"] for crop in crops if crop["作物名"] == target_name)
+
+            yield_increase = 0  # 現在の作物の増加率
+            seen_sources = set()  # すでに効果を適用した作物を記録
+
+            # 他の作物からの影響を確認
+            for source_crop in crops_in_year:
+                if target_crop == source_crop:
+                    continue  # 同じ作物は無視
+
+                source_name = source_crop["作物名"]
+                source_family = source_crop["所属科"]
+                source_sowing_month = next(crop["種まき月"] for crop in crops if crop["作物名"] == source_name)
+                source_harvest_month = next(crop["収穫月"] for crop in crops if crop["作物名"] == source_name)
+
+                # 栽培期間の重複を確認
+                if target_sowing_month <= source_harvest_month and target_harvest_month >= source_sowing_month:
+                    # 収量増加倍率マトリックスから倍率を取得
+                    if target_family in yield_synergy_matrix and source_family in yield_synergy_matrix[target_family]:
+                        if source_name not in seen_sources:  # 重複適用を防止
+                            multiplier = yield_synergy_matrix[target_family][source_family]
+                            # 基準値1を引いて増加分のみを取得
+                            yield_increase += max(0, multiplier - 1)
+                            seen_sources.add(source_name)  # 効果を記録
+
+            # 作物ごとの収量増加量を計算
+            total_increase = target_base_yield * yield_increase
+            yield_increase_per_crop[target_name] = total_increase
+            total_yield_increase += total_increase
+            
+            # 売上増加を計算
+            sales_increase = total_increase * target_price
+            total_sales_increase += sales_increase
+            
+            
+            # デバッグ情報を表示
+            #print(f"作物: {target_name} (栽培年: {year}), 基準収量: {target_base_yield:.2f}, "
+                  #f"増加率合計: {yield_increase:.2%}, 増加量: {total_increase:.2f}, "
+                  #f"売上増加: {sales_increase:.2f}, 影響元: {seen_sources}")
+
+    return total_yield_increase, total_sales_increase
+
+
+def evaluate_portfolio(portfolio, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage):
+    """
+    ポートフォリオの評価を行い、①単体収益の総和と②シナジー効果を計算する関数。
+
+    :param portfolio: 選択されたポートフォリオ（複数のチェーン）
+    :param crops: 作物データ（収穫量、取引価格、基準駆除コストなどを含む）
+    :param cost_reduction_data: 駆除コスト軽減データ
+    :param yield_synergy_matrix: 収量増加倍率マトリックス
+    :param hourly_wage: 時給
+    :return: ポートフォリオの総収益
+    """
+    # ① 各チェーンの単体収益の総和を計算
+    total_chain_revenue = 0
+    for chain in portfolio:
+        chain_revenue = calculate_chain_revenue(chain["内容"], crops, hourly_wage)
+        total_chain_revenue += chain_revenue
+
+    # ② シナジー効果を計算
+    # ②-1: 駆除コスト低減額
+    pest_control_savings = calculate_portfolio_synergy_same_year(portfolio, crops, cost_reduction_data)
+
+    # ②-2: 収量増加による売上増加額
+    _, sales_increase = calculate_yield_increase_and_sales(portfolio, crops, yield_synergy_matrix)
+
+    # ② シナジー効果の合計
+    total_synergy_effect = pest_control_savings + sales_increase
+
+    # 総収益 = ① + ②
+    total_portfolio_revenue = total_chain_revenue + total_synergy_effect
+
+    # 結果を出力
+    print("\n◆ポートフォリオ評価結果:")
+    print(f"1 各チェーンの単体収益の総和: {total_chain_revenue:.2f}")
+    print(f"2-1 駆除コスト低減額: {pest_control_savings:.2f}")
+    print(f"2-2 収量増加による売上増加額: {sales_increase:.2f}")
+    #print(f"2-1,2 シナジー効果の総和: {total_synergy_effect:.2f}")
+    print(f"総収益: {total_portfolio_revenue:.2f}")
+    
+    
+    # ポートフォリオの中身を出力
+    print("\n◆ポートフォリオの詳細:")
+    for chain in portfolio:
+        print(f"チェーン番号: {chain['チェーン番号']}, 利益: {chain['利益']:.2f}")
+        for crop in chain["内容"]:
+            print(f"  作物名: {crop['作物名']}, 栽培年: {crop['栽培年']}, 所属科: {crop['所属科']}")
+        print("-" * 30)
+
+    return total_portfolio_revenue
+
+
+def generate_initial_chains(crops, hourly_wage, max_years):
+    """
+    チェーンを生成する関数。生成されたチェーンはGAの初期集団生成に活用可能。
+    
+    :param crops: 作物データリスト
+    :param hourly_wage: 時給
+    :param max_years: 最大栽培年数
+    :return: チェーンのリスト
+    """
+    chains = generate_all_chains(crops, hourly_wage, max_years)
+    
+    # デバッグ用: 生成されたチェーン数を確認
+    print(f"生成されたチェーン数: {len(chains)}")
+    return chains
+
+
+# --- GAの基本関数 ---
+def generate_random_portfolio(chains, num_chains=4):
+    """ランダムなポートフォリオを生成"""
+    return random.sample(chains, num_chains)
+
+def calculate_fitness(portfolio, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage):
+    """ポートフォリオの適応度を計算"""
+    return evaluate_portfolio(portfolio, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage)
+
+def select_parents(population, fitness_scores):
+    """トーナメント選択で親を選ぶ"""
+    tournament_size = 5
+    selected = []
+    for _ in range(2):  # 親2つを選ぶ
+        candidates = random.sample(list(zip(population, fitness_scores)), tournament_size)
+        winner = max(candidates, key=lambda x: x[1])  # 適応度が最大のものを選択
+        selected.append(winner[0])
+    return selected
+
+def evaluate_fitness(portfolio, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage):
+    """
+    ポートフォリオの適応度（収益）を評価する。
+    
+    :param portfolio: ポートフォリオ（チェーンのリスト）
+    :param crops: 作物データリスト
+    :param cost_reduction_data: 駆除コスト軽減データ
+    :param yield_synergy_matrix: 収量増加倍率マトリックス
+    :param hourly_wage: 時給
+    :return: ポートフォリオの総収益
+    """
+    return evaluate_portfolio(portfolio, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage)
+
+
+def crossover(parent1, parent2):
+    """2:2の交叉を実現"""
+    split_point = 2
+    child1 = parent1[:split_point] + parent2[split_point:]
+    child2 = parent2[:split_point] + parent1[split_point:]
+    return child1, child2
+
+def mutate(portfolio, chains):
+    """突然変異: ランダムに1つのチェーンを置き換え"""
+    mutated_portfolio = portfolio[:]
+    index_to_mutate = random.randint(0, len(portfolio) - 1)
+    mutated_portfolio[index_to_mutate] = random.choice(chains)
+    return mutated_portfolio
+
+# --- 遺伝的アルゴリズムの実装 ---
+def genetic_algorithm(chains, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage):
+    # 初期集団を生成
+    population = [generate_random_portfolio(chains) for _ in range(POPULATION_SIZE)]
+    fitness_scores = [
+        calculate_fitness(ind, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage)
+        for ind in population
+    ]
+
+    best_fitness = max(fitness_scores)
+    best_portfolio = population[fitness_scores.index(best_fitness)]
+
+    generation = 0
+    stagnation_counter = 0  # 収束判定用カウンタ
+    fitness_history = []  # 各世代の最良適応度を記録
+    best_portfolios_history = []  # 各世代の最適ポートフォリオを記録
+
+    while generation < MAX_GENERATIONS and stagnation_counter < CONVERGENCE_THRESHOLD:
+        next_population = []
+
+        # エリート選択: 最良個体を次世代にそのままコピー
+        next_population.append(best_portfolio)
+
+        while len(next_population) < POPULATION_SIZE:
+            # 親選択
+            parent1, parent2 = select_parents(population, fitness_scores)
+
+            # 交叉
+            if random.random() < CROSSOVER_RATE:
+                child1, child2 = crossover(parent1, parent2)
+            else:
+                child1, child2 = parent1[:], parent2[:]
+
+            # 突然変異
+            if random.random() < MUTATION_RATE:
+                child1 = mutate(child1, chains)
+            if random.random() < MUTATION_RATE:
+                child2 = mutate(child2, chains)
+
+            # 次世代に追加
+            next_population.extend([child1, child2])
+
+        # 次世代の適応度を計算
+        population = next_population[:POPULATION_SIZE]
+        fitness_scores = [
+            calculate_fitness(ind, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage)
+            for ind in population
+        ]
+
+        # 世代最良の適応度を記録
+        current_best_fitness = max(fitness_scores)
+        current_best_portfolio = population[fitness_scores.index(current_best_fitness)]
+        fitness_history.append(current_best_fitness)
+        best_portfolios_history.append(current_best_portfolio)  # 最適ポートフォリオの保存
+
+        # 最良解の更新
+        if current_best_fitness > best_fitness:
+            best_fitness = current_best_fitness
+            best_portfolio = current_best_portfolio
+            stagnation_counter = 0  # 収束カウンタをリセット
+        else:
+            stagnation_counter += 1
+
+        # 世代情報の出力
+        print(f"Generation {generation}: Best Fitness = {best_fitness:.2f}, Average Fitness = {sum(fitness_scores) / len(fitness_scores):.2f}")
+        generation += 1
+
+    # 最終結果を出力
+    #print("\nGA 結果")
+    #print(f"最良適応度: {best_fitness:.2f}")
+    #print(f"世代ごとの最適解変遷を以下に出力します：")
+    #for gen, portfolio in enumerate(best_portfolios_history):
+        #print(f"Generation {gen} (Max Fitness: {current_best_fitness:.2f}):")
+        #for chain in portfolio:
+            #print(f"チェーン番号: {chain['チェーン番号']}")
+            #for crop in chain["内容"]:
+                #print(f"  - {crop['栽培年']}年目： {crop['作物名']} - {crop['所属科']}")
+        #print("-" * 40)
+
+    return best_portfolio, fitness_history
+
+
+# --- 実行 ---
+if __name__ == "__main__":
+    # チェーンを事前生成
+    chains = generate_all_chains(crops, hourly_wage, max_years=max_years_input)
+
+    # 遺伝的アルゴリズムの実行
+    best_portfolio, fitness_history = genetic_algorithm(
+        chains, crops, cost_reduction_data, yield_synergy_matrix, hourly_wage
+    )
+
+    # --- 進化プロセスを可視化 ---
+    import matplotlib.pyplot as plt
+
+    # 適応度履歴のプロット
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(len(fitness_history)), fitness_history, marker='o', linestyle='-')
+    plt.title("Fitness Progress Over Generations", fontsize=14)
+    plt.xlabel("Generation", fontsize=12)
+    plt.ylabel("Best Fitness", fontsize=12)
+    plt.grid(True)
+    plt.show()
